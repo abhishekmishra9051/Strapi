@@ -1,0 +1,161 @@
+name: "Terraform_Automation"
+
+on:
+  push:
+    branches:
+      - master
+
+env:
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID_AM }}
+  ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET_AM }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID_AM }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID_AM }}
+  ROOT_PATH: "${{ github.workspace }}/Strapi"
+
+permissions:
+  contents: read
+
+jobs:
+  terraform_validate:
+    name: "Terraform validate"
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ${{ env.ROOT_PATH }}
+
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: ${{ env.ROOT_PATH }}
+
+  terraform_fmt:
+    name: "Terraform format"
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ${{ env.ROOT_PATH }}
+
+      - name: Terraform Format
+        run: terraform fmt -check -recursive
+        working-directory: ${{ env.ROOT_PATH }}
+
+  terraform_plan:
+    name: "Terraform plan"
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ${{ env.ROOT_PATH }}
+
+      - name: Terraform Plan
+        run: terraform plan
+        working-directory: ${{ env.ROOT_PATH }}
+
+  terraform_apply:
+    name: "Terraform apply"
+    runs-on: ubuntu-latest
+    needs: terraform_plan
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ${{ env.ROOT_PATH }}
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+        working-directory: ${{ env.ROOT_PATH }}
+
+  cleanup:
+    name: "Cleanup on Failure or Error"
+    runs-on: ubuntu-latest
+    needs: terraform_apply
+    if: ${{ always() && (failure() || cancelled() || needs.terraform_apply.outcome == 'failure') }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ${{ env.ROOT_PATH }}
+
+      - name: Cleanup
+        run: terraform destroy -auto-approve
+        working-directory: ${{ env.ROOT_PATH }}
+
+  destroy_infrastructure:
+    name: "Destroy the infrastructure"
+    runs-on: ubuntu-latest
+    needs: terraform_apply
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ${{ env.ROOT_PATH }}
+
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve
+        working-directory: ${{ env.ROOT_PATH }}
